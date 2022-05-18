@@ -5,18 +5,19 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"strings"
 )
 
 func (b *Bot) handleCommand(message *tgbotapi.Message) error {
-	fmt.Println(message.Command())
+	//fmt.Println(message.Command())
 	switch message.Command() {
 	case "start":
 		return b.handleStartCommand(message)
 	case "info":
 		return b.handleInfoCommand(message)
 	default:
+		return b.handleUnknownCommand(message)
 	}
-	return nil
 }
 
 func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
@@ -48,19 +49,21 @@ func (b *Bot) handleInfoCommand(message *tgbotapi.Message) error {
 	return err
 }
 
-func (b *Bot) handleGeoLocationCommand(message *tgbotapi.Message) error {
+func (b *Bot) handleUnknownCommand(message *tgbotapi.Message) error {
+	text := "Эта команда не поддерживается"
+	msg := tgbotapi.NewMessage(message.Chat.ID, text)
+	_, err := b.Send(msg)
+	return err
+}
+
+func (b *Bot) handleGeoLocationMessage(message *tgbotapi.Message) error {
 	coord := flyDataClient.Coordinate{
 		Lng: message.Location.Longitude,
 		Lat: message.Location.Latitude,
 	}
-	helloText := fmt.Sprintf("Выбранные географические координаты: %f ,%f \n"+
-		"Полёт дрона здесь разрешен/запрещен/требует согласования\n"+
-		"Боллее подробная информация: [ссылка на сайт]\n"+
-		"Информация о погоде сайчас:", coord.Lng, coord.Lat)
-
-	msg := tgbotapi.NewMessage(message.Chat.ID, helloText)
+	text, err := b.getInfoText(coord, 300)
+	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = "HTML"
-
 	callbackPlanFly, _ := json.Marshal(Callback{
 		CallbackType: planFlyCallback,
 		Data:         coord,
@@ -76,8 +79,47 @@ func (b *Bot) handleGeoLocationCommand(message *tgbotapi.Message) error {
 	)
 
 	msg.ReplyMarkup = numericKeyboard
-	fmt.Println(b.flyClient.GetForecastWeather(coord))
-	_, err := b.Send(msg)
-	fmt.Println(err)
+	//fmt.Println(b.flyClient.GetForecastWeather(coord))
+	_, err = b.Send(msg)
+	//fmt.Println(err)
 	return err
+}
+
+func (b Bot) getInfoText(coord flyDataClient.Coordinate, radius int) (string, error) {
+	text := fmt.Sprintf("Полученые географические координаты:<b> %f ,%f </b>\n\n", coord.Lng, coord.Lat)
+
+	zoneInfo, err := b.flyClient.CheckConditions(coord, radius)
+	if err == nil {
+		if zoneInfo.NearBoundaryZone {
+			text += "Выбранные координаты находятся в 20-км приграничной зоне. Полёты здесь запрещены\n\n"
+		} else {
+			if len(zoneInfo.ActiveZones) == 0 {
+				text += "В этом месте нет действующих зон ограничений полётов\n\n"
+			} else {
+				text += "В этом месте имеются зоны, <b>ограничивающие полеты</b>: " +
+					strings.Join(zoneInfo.ActiveZones, ", ") + "\n\n"
+			}
+			if len(zoneInfo.InactiveZones) > 0 {
+				text += "Также в данный момент <b>не действуют</b>, но могут стать активными следующие зоны:" +
+					strings.Join(zoneInfo.InactiveZones, ", ") + "\n\n"
+			}
+		}
+	} else {
+		text += "К сожалению, не удалось получить информацию о зонах ограничения полетов от сервера. \n\n"
+	}
+
+	weatherInfo, err := b.flyClient.GetForecastWeather(coord)
+	if err == nil {
+		text += fmt.Sprintf("<b>Информация о погоде:</b> \n")
+		text += fmt.Sprintf("Температура: %v *C\n", weatherInfo.Current.Temperature)
+		text += fmt.Sprintf("Ветер: %v м/c, %v \n", weatherInfo.Current.WindSpeed, weatherInfo.Current.WindDeg)
+		text += fmt.Sprintf("Облачность: %v%% \n", weatherInfo.Current.Humidity)
+		text += fmt.Sprintf("Вероятность выпадения осадков: %v%% \n", weatherInfo.Current.PrecipProb*100)
+		text += fmt.Sprintf("Видимость: %v м\n", weatherInfo.Current.Visibility)
+		text += fmt.Sprintf("Давление: %v мм рт.ст. \n\n", weatherInfo.Current.Pressure)
+	} else {
+		text += "К сожалению, не удалось получить информацию о погоде от сервера. \n\n"
+	}
+
+	return text, nil
 }

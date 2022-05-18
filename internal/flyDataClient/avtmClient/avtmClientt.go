@@ -101,7 +101,7 @@ func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) flyDataClient.W
 }
 
 //GetForecastWeather receives forecast weather as flyDataClient.WeatherData form Avmt api.
-func (c AvmtClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.WeatherData, error) {
+func (c AvmtClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.WeatherForecast, error) {
 	url, err := url.Parse(forecastWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -131,25 +131,19 @@ func (c AvmtClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*fl
 	if err = decoder.Decode(&resp); err != nil {
 		return nil, err
 	}
-	ans := struct {
-		WeatherForecast struct {
-			Current flyDataClient.WeatherData   `json:"current"`
-			Hourly  []flyDataClient.WeatherData `json:"hourly"`
-		} `json:"weatherForecast"`
-	}{
-		WeatherForecast: struct {
-			Current flyDataClient.WeatherData   `json:"current"`
-			Hourly  []flyDataClient.WeatherData `json:"hourly"`
-		}{},
+	ans := flyDataClient.WeatherForecast{
+		Current: flyDataClient.WeatherData{},
+		Hourly:  make([]flyDataClient.WeatherData, 0, len(resp.WeatherForecast.Hourly)),
 	}
+
 	tl, _ := time.LoadLocation(resp.TimeZoneName)
-	ans.WeatherForecast.Current = resp.WeatherForecast.Current.castToWeatherData(tl)
+	ans.Current = resp.WeatherForecast.Current.castToWeatherData(tl)
 	for _, data := range resp.WeatherForecast.Hourly {
 		fmt.Println(data.Timestamp)
-		ans.WeatherForecast.Hourly = append(ans.WeatherForecast.Hourly, data.castToWeatherData(tl))
+		ans.Hourly = append(ans.Hourly, data.castToWeatherData(tl))
 
 	}
-	return nil, nil
+	return &ans, nil
 }
 
 type JSONCheckConditions struct {
@@ -171,21 +165,46 @@ type JSONCheckConditions struct {
 }
 
 type ZoneInfo struct {
-	Inactive           []interface{} `json:"inactive"`
-	Active             []interface{} `json:"active"`
-	IntersectionCodes  []string      `json:"intersectionCodes"`
-	CompletedWithError bool          `json:"completedWithError"`
-	FullTime           int           `json:"fullTime"`
-	ComputeTime        int           `json:"computeTime"`
-	SelectTime         int           `json:"selectTime"`
+	Inactive           []map[string]interface{} `json:"inactive"`
+	Active             []map[string]interface{} `json:"active"`
+	IntersectionCodes  []string                 `json:"intersectionCodes"`
+	CompletedWithError bool                     `json:"completedWithError"`
+	FullTime           int                      `json:"fullTime"`
+	ComputeTime        int                      `json:"computeTime"`
+	SelectTime         int                      `json:"selectTime"`
 }
 
-//type IntersectionZoneInfo{
-//
-//}
+func (loc *JSONCheckConditions) castJSONtoCondition() flyDataClient.Condition {
+	ans := flyDataClient.Condition{
+		DaylightHours:       loc.DaylightHours,
+		HasIntersections:    loc.HasIntersections,
+		IntoCountryBoundary: loc.IntoCountryBoundary,
+		NearBoundaryZone:    loc.NearBoundaryZone,
+		Permanent:           loc.Permanent,
+		PolarDayOrNight:     loc.PolarDayOrNight,
+		LocalTimeInLocation: "",
+		Sunrise:             loc.Sunrise,
+		Sunset:              loc.Sunset,
+		ActiveZones:         []string{},
+		InactiveZones:       []string{},
+	}
+	for _, info := range loc.Zones {
+		ans.ActiveZones = append(ans.ActiveZones, info.IntersectionCodes...)
+		for _, m := range info.Inactive {
+			if i, ok := m["code"]; ok {
+				//fmt.Println("code")
+				if st, ok := i.(string); ok {
+					ans.InactiveZones = append(ans.InactiveZones, st)
+				}
+			}
+		}
+
+	}
+	return ans
+}
 
 //CheckConditions  receives fly zone Conditions form Avmt api.
-func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius int) (int, error) {
+func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius int) (flyDataClient.Condition, error) {
 	type Geometry struct {
 		Type        string         `json:"type"`
 		Coordinates [][][2]float64 `json:"coordinates"`
@@ -206,7 +225,7 @@ func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius 
 	coordinates := make([][2]float64, 0, n)
 	for i := 0; i < n; i++ {
 		newCoord := circleCoordinate(coordinate, radius, 360/n*i)
-		fmt.Println(newCoord)
+		//fmt.Println(newCoord)
 		coordinates = append(coordinates, [2]float64{newCoord.Lng, newCoord.Lat})
 	}
 	geometry := Geometry{
@@ -227,18 +246,18 @@ func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius 
 	r := bytes.NewReader(data)
 	resp, err := c.webClient.Post(checkConditionsEndPoint, "application/json", r)
 	if err != nil {
-		return 0, err
+		return flyDataClient.Condition{}, err
 	}
 	decoder := json.NewDecoder(resp.Body)
 	ans := &JSONCheckConditions{}
 	decoder.Decode(&ans)
-	for s, i := range ans.Zones {
-		fmt.Println(s)
-		fmt.Println(i.IntersectionCodes)
-		fmt.Println(i.Inactive)
-	}
-	fmt.Println(ans)
-	return 0, nil
+	//for s, i := range ans.Zones {
+	//	fmt.Println(s)
+	//	fmt.Println(i.Active)
+	//	fmt.Println(i.Inactive)
+	//}
+	//fmt.Println(ans)
+	return ans.castJSONtoCondition(), nil
 }
 func circleCoordinate(coordinate flyDataClient.Coordinate, radius int, andreDeg int) flyDataClient.Coordinate {
 	angle := float64(andreDeg) * math.Pi * 2 / 360

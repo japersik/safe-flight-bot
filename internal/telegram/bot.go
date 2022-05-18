@@ -24,6 +24,7 @@ func (b *Bot) Start() error {
 	//	Lat: 60,
 	//}, 2000)
 
+	// Receiving and processing updates
 	updates := b.bot.GetUpdatesChan(u)
 	for update := range updates {
 		go b.manageUpdate(update)
@@ -36,11 +37,11 @@ func (b Bot) manageUpdate(update tgbotapi.Update) {
 	if update.CallbackData() != "" {
 		b.handleCallback(update.FromChat(), update.CallbackData())
 	}
-	if update.Message == nil { // ignore any non-Message Updates
-		return
+	if update.Message == nil {
+		// ignore any non-Message Updates
 	} else if update.Message.Location != nil {
 		// Обработка отправленной геолокации
-		b.handleGeoLocationCommand(update.Message)
+		b.handleGeoLocationMessage(update.Message)
 	} else if update.Message.IsCommand() {
 		// Обработка отправленной команды
 		b.handleCommand(update.Message)

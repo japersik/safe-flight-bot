@@ -6,6 +6,10 @@ type Coordinate struct {
 	Lng float64 `json:"lng"`
 	Lat float64 `json:"lat"`
 }
+type WeatherForecast struct {
+	Current WeatherData   `json:"current"`
+	Hourly  []WeatherData `json:"hourly"`
+}
 
 type WeatherData struct {
 	PrecipProb  float64
@@ -30,35 +34,26 @@ type CurrentWeatherData struct {
 }
 
 type Condition struct {
-	DaylightHours       bool                `json:"daylightHours"`
-	HasIntersections    bool                `json:"hasIntersections"`
-	IntoCountryBoundary bool                `json:"intoCountryBoundary"`
-	NearBoundaryZone    bool                `json:"nearBoundaryZone"`
-	Permanent           bool                `json:"permanent"`
-	PolarDayOrNight     bool                `json:"polarDayOrNight"`
-	LocalTimeInLocation string              `json:"localTimeInLocation"`
-	Sunrise             string              `json:"sunrise"`
-	Sunset              string              `json:"sunset"`
-	Zones               map[string]ZoneInfo `json:"map"`
-}
-
-type ZoneInfo struct {
-	InactiveCodes      []interface{} `json:"inactive"`
-	ActiveCodes        []interface{} `json:"active"`
-	IntersectionCodes  []string      `json:"intersectionCodes"`
-	CompletedWithError bool          `json:"completedWithError"`
-	FullTime           int           `json:"fullTime"`
-	ComputeTime        int           `json:"computeTime"`
-	SelectTime         int           `json:"selectTime"`
+	DaylightHours       bool     `json:"daylightHours"`
+	HasIntersections    bool     `json:"hasIntersections"`
+	IntoCountryBoundary bool     `json:"intoCountryBoundary"`
+	NearBoundaryZone    bool     `json:"nearBoundaryZone"`
+	Permanent           bool     `json:"permanent"`
+	PolarDayOrNight     bool     `json:"polarDayOrNight"`
+	LocalTimeInLocation string   `json:"localTimeInLocation"`
+	Sunrise             string   `json:"sunrise"`
+	Sunset              string   `json:"sunset"`
+	ActiveZones         []string `json:"activeZones"`
+	InactiveZones       []string `json:"InactiveZones"`
 }
 
 type WeatherInfoSource interface {
-	GetForecastWeather(Coordinate) (*WeatherData, error)
+	GetForecastWeather(Coordinate) (*WeatherForecast, error)
 	GetCurrentWeather(Coordinate) (*CurrentWeatherData, error)
 }
 
 type ZoneInfoSource interface {
-	CheckConditions(Coordinate, int) (int, error)
+	CheckConditions(Coordinate, int) (Condition, error)
 }
 
 type LocalityInfo struct {
