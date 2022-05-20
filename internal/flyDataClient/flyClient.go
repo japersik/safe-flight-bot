@@ -62,11 +62,11 @@ type LocalityInfo struct {
 }
 
 type LocalityInfoSource interface {
-	GetLocalityFlyInfo(Coordinate) (LocalityInfo, error)
+	GetLocalityFlyInfo(Coordinate) (*LocalityInfo, error)
 }
 
 type Client struct {
 	WeatherInfoSource
 	ZoneInfoSource
-	//LocalityInfoSource
+	LocalityInfoSource
 }

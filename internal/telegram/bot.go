@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 )
@@ -33,7 +32,6 @@ func (b *Bot) Start() error {
 }
 
 func (b Bot) manageUpdate(update tgbotapi.Update) {
-	fmt.Println(update)
 	if update.CallbackData() != "" {
 		b.handleCallback(update.FromChat(), update.CallbackData())
 	}

@@ -3,7 +3,6 @@ package avtmClient
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"math"
 	"net/http"
@@ -18,12 +17,12 @@ const (
 	checkConditionsEndPoint = "https://map.avtm.center/app/flight-check/check-conditions"
 )
 
-type AvmtClient struct {
+type AvtmClient struct {
 	webClient http.Client
 }
 
-func NewAvmtClient() *AvmtClient {
-	return &AvmtClient{
+func NewAvtmClient() *AvtmClient {
+	return &AvtmClient{
 		http.Client{
 			Timeout: time.Second * 3,
 		},
@@ -31,7 +30,7 @@ func NewAvmtClient() *AvmtClient {
 }
 
 //GetCurrentWeather receives current  weather as flyDataClient.CurrentWeatherData form Avmt api.
-func (c AvmtClient) GetCurrentWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.CurrentWeatherData, error) {
+func (c AvtmClient) GetCurrentWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.CurrentWeatherData, error) {
 	url, err := url.Parse(currentWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -101,7 +100,7 @@ func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) flyDataClient.W
 }
 
 //GetForecastWeather receives forecast weather as flyDataClient.WeatherData form Avmt api.
-func (c AvmtClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.WeatherForecast, error) {
+func (c AvtmClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.WeatherForecast, error) {
 	url, err := url.Parse(forecastWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -139,7 +138,6 @@ func (c AvmtClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*fl
 	tl, _ := time.LoadLocation(resp.TimeZoneName)
 	ans.Current = resp.WeatherForecast.Current.castToWeatherData(tl)
 	for _, data := range resp.WeatherForecast.Hourly {
-		fmt.Println(data.Timestamp)
 		ans.Hourly = append(ans.Hourly, data.castToWeatherData(tl))
 
 	}
@@ -192,7 +190,7 @@ func (loc *JSONCheckConditions) castJSONtoCondition() flyDataClient.Condition {
 		ans.ActiveZones = append(ans.ActiveZones, info.IntersectionCodes...)
 		for _, m := range info.Inactive {
 			if i, ok := m["code"]; ok {
-				//fmt.Println("code")
+
 				if st, ok := i.(string); ok {
 					ans.InactiveZones = append(ans.InactiveZones, st)
 				}
@@ -204,7 +202,7 @@ func (loc *JSONCheckConditions) castJSONtoCondition() flyDataClient.Condition {
 }
 
 //CheckConditions  receives fly zone Conditions form Avmt api.
-func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius int) (flyDataClient.Condition, error) {
+func (c AvtmClient) CheckConditions(coordinate flyDataClient.Coordinate, radius int) (flyDataClient.Condition, error) {
 	type Geometry struct {
 		Type        string         `json:"type"`
 		Coordinates [][][2]float64 `json:"coordinates"`
@@ -225,7 +223,6 @@ func (c AvmtClient) CheckConditions(coordinate flyDataClient.Coordinate, radius 
 	coordinates := make([][2]float64, 0, n)
 	for i := 0; i < n; i++ {
 		newCoord := circleCoordinate(coordinate, radius, 360/n*i)
-		//fmt.Println(newCoord)
 		coordinates = append(coordinates, [2]float64{newCoord.Lng, newCoord.Lat})
 	}
 	geometry := Geometry{

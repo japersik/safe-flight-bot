@@ -4,6 +4,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient/avtmClient"
+	"github.com/japersik/safe-flight-bot/internal/flyDataClient/openstreetmap"
 	"github.com/japersik/safe-flight-bot/internal/telegram"
 	"log"
 	"os"
@@ -20,8 +21,9 @@ func main() {
 		return
 	}
 
-	avtm := avtmClient.NewAvmtClient()
-	flClient := flyDataClient.Client{WeatherInfoSource: avtm, ZoneInfoSource: avtm}
+	avtm := avtmClient.NewAvtmClient()
+	maps := openstreetmap.NewOpenStreetClient()
+	flClient := flyDataClient.Client{WeatherInfoSource: avtm, ZoneInfoSource: avtm, LocalityInfoSource: maps}
 	myBot := telegram.NewBot(bot, flClient)
 
 	if err := myBot.Start(); err != nil {

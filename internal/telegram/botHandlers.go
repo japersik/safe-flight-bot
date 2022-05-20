@@ -87,6 +87,15 @@ func (b *Bot) handleGeoLocationMessage(message *tgbotapi.Message) error {
 
 func (b Bot) getInfoText(coord flyDataClient.Coordinate, radius int) (string, error) {
 	text := fmt.Sprintf("Полученые географические координаты:<b> %f ,%f </b>\n\n", coord.Lng, coord.Lat)
+	locationInfo, err := b.flyClient.LocalityInfoSource.GetLocalityFlyInfo(coord)
+	if err != nil {
+		text += "К сожалению, не удалось получить информацию о населенных пунктах вблизи. \n\n"
+	} else {
+		text += "Точка находится в: " + locationInfo.Name + "\n"
+		if locationInfo.FlyRestriction {
+			text += "Полёты над населёнными пунктами <b>требуют согласования</b> с администрацией\n\n"
+		}
+	}
 
 	zoneInfo, err := b.flyClient.CheckConditions(coord, radius)
 	if err == nil {
