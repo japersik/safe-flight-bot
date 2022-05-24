@@ -5,8 +5,7 @@ on:
       - master
 
 env:
-  REGISTRY: "hub.docker.com/japersik"
-  IMAGE_NAME: "japersik/save-flight-bot"
+  IMAGE_NAME: "save-flight-bot"
   CONTAINER_NAME: "save-flight-bot-container"
 
 
@@ -18,16 +17,42 @@ jobs:
       - name: Checkout master
         uses: actions/checkout@v2
 
-      - name: Build container image
-        run: docker build -t $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
-
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - name: Login to dockerhub
+        uses: docker/login-action@v1
         with:
-          token: ${{ secrets.DOCKER_TOKEN }}
+            username: ${{ secrets.DOCKER_USERNAME }}
+            password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Log in to DigitalOcean Container Registry with short-lived credentials
-        run: doctl registry login --expiry-seconds 600
+      - name: Build container image
+        run: docker build -t $(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
 
-      - name: Push image to DigitalOcean Container Registry
-        run: docker push $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+      - name: Push image to DockerHub
+        run: docker push $(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+
+    steps:
+      - name: Deploy to server via SSH action
+        uses: appleboy/ssh-action@v0.1.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSHKEY }}
+          envs: IMAGE_NAME,GITHUB_SHA,CONTAINER_NAME
+          script: |
+            # Login into Digital Ocean Registry
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_TOKEN }}
+            # Stop running container
+            docker stop $(echo $CONTAINER_NAME)
+            # Remove old container
+            docker rm $(echo $CONTAINER_NAME)
+            # Set env variables
+            export TG_BOT_TOKEN=${{ secrets.TG_TOKEN }}
+            # Run a new container from a new image
+            docker run -e TG_BOT_TOKEN -d \
+            --restart always \
+            --name $(echo $CONTAINER_NAME) \
+            $(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
