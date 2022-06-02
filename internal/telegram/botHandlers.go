@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"github.com/japersik/safe-flight-bot/model"
 	"strings"
 )
 
@@ -57,7 +57,7 @@ func (b *Bot) handleUnknownCommand(message *tgbotapi.Message) error {
 }
 
 func (b *Bot) handleGeoLocationMessage(message *tgbotapi.Message) error {
-	coord := flyDataClient.Coordinate{
+	coord := model.Coordinate{
 		Lng: message.Location.Longitude,
 		Lat: message.Location.Latitude,
 	}
@@ -85,7 +85,7 @@ func (b *Bot) handleGeoLocationMessage(message *tgbotapi.Message) error {
 	return err
 }
 
-func (b Bot) getInfoText(coord flyDataClient.Coordinate, radius int) (string, error) {
+func (b Bot) getInfoText(coord model.Coordinate, radius int) (string, error) {
 	text := fmt.Sprintf("Полученые географические координаты:<b> %f ,%f </b>\n\n", coord.Lng, coord.Lat)
 	locationInfo, err := b.flyClient.LocalityInfoSource.GetLocalityFlyInfo(coord)
 	if err != nil {

@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"github.com/japersik/safe-flight-bot/model"
 	"github.com/mitchellh/mapstructure"
+	"time"
 )
 
 type Callback struct {
@@ -36,11 +37,22 @@ func (b *Bot) handleCallback(chat *tgbotapi.Chat, callbackData string) error {
 	}
 	switch callback.CallbackType {
 	case planFlyCallback:
-		text = "Эта функция (планирования полётов) ещё не реализована, но скоро обязательно появится"
+		coords := model.Coordinate{}
+		err := mapstructure.Decode(callback.Data, &coords)
+		if err != nil {
+			return WrongCallbackErr
+		}
+
+		b.planner.PlanFly(model.FlyPlan{
+			Data:          model.FlyData{Coordinate: coords, UserId: chat.ID},
+			FlyDateTime:   time.Now(),
+			Notifications: nil,
+		})
+		text = "Полет запланирован"
 	case cancelFlyCallback:
 		text = "Эта функция (отмены полётов) ещё не реализована, но скоро обязательно появится"
 	case repeatRequestCallback:
-		coords := flyDataClient.Coordinate{}
+		coords := model.Coordinate{}
 		err := mapstructure.Decode(callback.Data, &coords)
 		if err != nil {
 			return WrongCallbackErr
@@ -48,11 +60,12 @@ func (b *Bot) handleCallback(chat *tgbotapi.Chat, callbackData string) error {
 		return b.handleRepeatRequestCallback(chat, coords)
 	}
 	msg := tgbotapi.NewMessage(chat.ID, text)
+	msg.ParseMode = "HTML"
 	_, err = b.Send(msg)
 	return err
 }
 
-func (b Bot) handleRepeatRequestCallback(chat *tgbotapi.Chat, coord flyDataClient.Coordinate) error {
+func (b Bot) handleRepeatRequestCallback(chat *tgbotapi.Chat, coord model.Coordinate) error {
 	text, err := b.getInfoText(coord, 300)
 	if err != nil {
 		return err

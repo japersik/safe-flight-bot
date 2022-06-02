@@ -3,7 +3,7 @@ package avtmClient
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"github.com/japersik/safe-flight-bot/model"
 	"math"
 	"net/http"
 	"net/url"
@@ -30,7 +30,7 @@ func NewAvtmClient() *AvtmClient {
 }
 
 //GetCurrentWeather receives current  weather as flyDataClient.CurrentWeatherData form Avmt api.
-func (c AvtmClient) GetCurrentWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.CurrentWeatherData, error) {
+func (c AvtmClient) GetCurrentWeather(coordinate model.Coordinate) (*model.CurrentWeatherData, error) {
 	url, err := url.Parse(currentWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -48,7 +48,7 @@ func (c AvtmClient) GetCurrentWeather(coordinate flyDataClient.Coordinate) (*fly
 		return nil, err
 	}
 	decoder := json.NewDecoder(response.Body)
-	ans := &flyDataClient.CurrentWeatherData{}
+	ans := &model.CurrentWeatherData{}
 	if err = decoder.Decode(ans); err != nil {
 		return nil, err
 	}
@@ -84,9 +84,9 @@ type JSONWeatherData struct {
 }
 
 //castToWeatherData
-func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) flyDataClient.WeatherData {
+func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) model.WeatherData {
 	t, _ := time.ParseInLocation(ctLayout, jwd.Timestamp, loc)
-	return flyDataClient.WeatherData{
+	return model.WeatherData{
 		PrecipProb:  jwd.PrecipProb,
 		Temperature: jwd.Temperature,
 		WindSpeed:   jwd.WindSpeed,
@@ -100,7 +100,7 @@ func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) flyDataClient.W
 }
 
 //GetForecastWeather receives forecast weather as flyDataClient.WeatherData form Avmt api.
-func (c AvtmClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*flyDataClient.WeatherForecast, error) {
+func (c AvtmClient) GetForecastWeather(coordinate model.Coordinate) (*model.WeatherForecast, error) {
 	url, err := url.Parse(forecastWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -130,9 +130,9 @@ func (c AvtmClient) GetForecastWeather(coordinate flyDataClient.Coordinate) (*fl
 	if err = decoder.Decode(&resp); err != nil {
 		return nil, err
 	}
-	ans := flyDataClient.WeatherForecast{
-		Current: flyDataClient.WeatherData{},
-		Hourly:  make([]flyDataClient.WeatherData, 0, len(resp.WeatherForecast.Hourly)),
+	ans := model.WeatherForecast{
+		Current: model.WeatherData{},
+		Hourly:  make([]model.WeatherData, 0, len(resp.WeatherForecast.Hourly)),
 	}
 
 	tl, _ := time.LoadLocation(resp.TimeZoneName)
@@ -172,8 +172,8 @@ type ZoneInfo struct {
 	SelectTime         int                      `json:"selectTime"`
 }
 
-func (loc *JSONCheckConditions) castJSONtoCondition() flyDataClient.Condition {
-	ans := flyDataClient.Condition{
+func (loc *JSONCheckConditions) castJSONtoCondition() model.Condition {
+	ans := model.Condition{
 		DaylightHours:       loc.DaylightHours,
 		HasIntersections:    loc.HasIntersections,
 		IntoCountryBoundary: loc.IntoCountryBoundary,
@@ -202,7 +202,7 @@ func (loc *JSONCheckConditions) castJSONtoCondition() flyDataClient.Condition {
 }
 
 //CheckConditions  receives fly zone Conditions form Avmt api.
-func (c AvtmClient) CheckConditions(coordinate flyDataClient.Coordinate, radius int) (flyDataClient.Condition, error) {
+func (c AvtmClient) CheckConditions(coordinate model.Coordinate, radius int) (model.Condition, error) {
 	type Geometry struct {
 		Type        string         `json:"type"`
 		Coordinates [][][2]float64 `json:"coordinates"`
@@ -243,7 +243,7 @@ func (c AvtmClient) CheckConditions(coordinate flyDataClient.Coordinate, radius 
 	r := bytes.NewReader(data)
 	resp, err := c.webClient.Post(checkConditionsEndPoint, "application/json", r)
 	if err != nil {
-		return flyDataClient.Condition{}, err
+		return model.Condition{}, err
 	}
 	decoder := json.NewDecoder(resp.Body)
 	ans := &JSONCheckConditions{}
@@ -256,11 +256,11 @@ func (c AvtmClient) CheckConditions(coordinate flyDataClient.Coordinate, radius 
 	//fmt.Println(ans)
 	return ans.castJSONtoCondition(), nil
 }
-func circleCoordinate(coordinate flyDataClient.Coordinate, radius int, andreDeg int) flyDataClient.Coordinate {
+func circleCoordinate(coordinate model.Coordinate, radius int, andreDeg int) model.Coordinate {
 	angle := float64(andreDeg) * math.Pi * 2 / 360
 	dx := float64(radius) * math.Cos(angle)
 	dy := float64(radius) * math.Sin(angle)
-	ans := flyDataClient.Coordinate{
+	ans := model.Coordinate{
 		Lat: coordinate.Lat + (180/math.Pi)*(dy/6378137),
 		Lng: coordinate.Lng + (180/math.Pi)*(dx/6378137)/math.Cos(coordinate.Lat*math.Pi/180),
 	}
