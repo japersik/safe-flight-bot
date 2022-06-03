@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const updateNotifyTime = 8
+const updateNotifyTime = 10 * time.Second
 
 type Planner interface {
 	SetNotifier(notifier Notifier)
@@ -25,11 +25,9 @@ type Notifier interface {
 }
 
 type plansData struct {
-	PlanId             uint64          `json:"planId"`
-	EveryDayPlans      []model.FlyPlan `json:"everyDayPlans"`
-	DateTimePlans      []model.FlyPlan `json:"dateTimePlans"`
-	everyDayPlansMutex *sync.Mutex
-	dateTimePlansMutex *sync.Mutex
+	MaxPlanId      uint64                    `json:"maxPlanId"`
+	PlansInfo      map[uint64]*model.FlyPlan `json:"everyDayPlans,omitempty"`
+	plansInfoMutex *sync.Mutex
 }
 type Planer struct {
 	notifier       Notifier
@@ -38,14 +36,17 @@ type Planer struct {
 	notifyMapMutex *sync.Mutex
 }
 
+//SetNotifier ...
 func (p *Planer) SetNotifier(notifier Notifier) {
 	p.notifier = notifier
 }
+
+//Start ...
 func (p *Planer) Start() error {
 	if p.notifier == nil {
 		return errors.New("notifier not defined")
 	}
-	ticker := time.NewTicker(updateNotifyTime * time.Second)
+	ticker := time.NewTicker(updateNotifyTime)
 	quit := make(chan struct{})
 	go func() {
 		for {
@@ -60,32 +61,76 @@ func (p *Planer) Start() error {
 	}()
 	return nil
 }
+
+func (p *Planer) sendNotify(data model.FlyPlan) error {
+	flyId := data.FlyId
+	if !data.IsEveryDayPlan {
+		p.notifyMapMutex.Lock()
+		defer p.notifyMapMutex.Unlock()
+		delete(p.notifyMap, flyId)
+		p.plansData.plansInfoMutex.Lock()
+		defer p.plansData.plansInfoMutex.Unlock()
+		fmt.Println("Before:", len(p.plansData.PlansInfo[flyId].Notifications), p.plansData.PlansInfo[flyId].Notifications)
+		for i, timeDir := range p.plansData.PlansInfo[flyId].Notifications {
+
+			if p.plansData.PlansInfo[flyId].FlyDateTime.Sub(time.Now())+timeDir < 0 {
+				p.plansData.PlansInfo[flyId].Notifications[i] =
+					p.plansData.PlansInfo[flyId].Notifications[len(p.plansData.PlansInfo[flyId].Notifications)-1]
+				p.plansData.PlansInfo[flyId].Notifications = p.plansData.PlansInfo[flyId].Notifications[:len(p.plansData.PlansInfo[flyId].Notifications)-1]
+			}
+
+		}
+		fmt.Println("After:", len(p.plansData.PlansInfo[flyId].Notifications), p.plansData.PlansInfo[flyId].Notifications)
+		if len(p.plansData.PlansInfo[flyId].Notifications) == 0 && p.plansData.PlansInfo[flyId].FlyDateTime.Sub(time.Now()) < 0 {
+			delete(p.plansData.PlansInfo, flyId)
+		}
+	}
+	err := p.notifier.Notify(data)
+
+	return err
+}
+
 func (p *Planer) updateNotificationList() {
-	dayTimeNow := (time.Now().Hour()*60+time.Now().Minute())*60 + time.Now().Second()
+	//timers and plans map lock
 	p.notifyMapMutex.Lock()
 	defer p.notifyMapMutex.Unlock()
-	p.plansData.dateTimePlansMutex.Lock()
-	defer p.plansData.dateTimePlansMutex.Unlock()
-	//for i, plan := range p.plansData.DateTimePlans {
-	//	dayTime := plan.FlyDateTime.Hour()*60 + plan.FlyDateTime.Minute()
-	//	deltaT := dayTime - dayTimeNow
-	//	if deltaT < updateNotifyTime {
-	//		//добавить в задание
-	//	}
-	//}
-	p.plansData.everyDayPlansMutex.Lock()
-	defer p.plansData.everyDayPlansMutex.Unlock()
-	for _, plan := range p.plansData.EveryDayPlans {
-		dayTime := (plan.FlyDateTime.Hour()*60+plan.FlyDateTime.Minute())*60 + plan.FlyDateTime.Second()
-		deltaT := dayTime - dayTimeNow
-		if deltaT <= updateNotifyTime && deltaT > -1 {
-			fmt.Println(deltaT)
+	p.plansData.plansInfoMutex.Lock()
+	defer p.plansData.plansInfoMutex.Unlock()
+
+	for _, plan := range p.plansData.PlansInfo {
+		if plan.Notifications != nil && len(plan.Notifications) > 0 {
+			for _, notification := range plan.Notifications {
+				deltaT := plan.FlyDateTime.Sub(time.Now()) + notification
+				if plan.IsEveryDayPlan {
+					deltaT = deltaT % (time.Hour * 24)
+				}
+				if deltaT <= updateNotifyTime && deltaT > -2*time.Second {
+					fmt.Println("Adding ", deltaT)
+					currentPlan := plan
+					//if _, ok := p.notifyMap[plan.FlyId]; !ok {
+					p.notifyMap[plan.FlyId] = time.AfterFunc(deltaT, func() {
+						p.sendNotify(*currentPlan)
+						p.notifyMapMutex.Lock()
+						defer p.notifyMapMutex.Unlock()
+						delete(p.notifyMap, currentPlan.FlyId)
+					})
+					//}
+				}
+			}
+		}
+		deltaT := plan.FlyDateTime.Sub(time.Now())
+		if plan.IsEveryDayPlan {
+			deltaT = deltaT % (time.Hour * 24)
+			if deltaT < 0 {
+				deltaT += time.Hour * 24
+			}
+			fmt.Println("Every day", deltaT)
+		}
+		if deltaT <= updateNotifyTime && deltaT > -2*time.Second {
 			currentPlan := plan
-			fmt.Println("Adding", plan.Data)
-			fmt.Println(plan)
 			if _, ok := p.notifyMap[plan.FlyId]; !ok {
-				p.notifyMap[plan.FlyId] = time.AfterFunc(time.Second*time.Duration(deltaT), func() {
-					p.notifier.Notify(currentPlan)
+				p.notifyMap[plan.FlyId] = time.AfterFunc(deltaT, func() {
+					p.sendNotify(*currentPlan)
 					p.notifyMapMutex.Lock()
 					defer p.notifyMapMutex.Unlock()
 					delete(p.notifyMap, currentPlan.FlyId)
@@ -94,6 +139,7 @@ func (p *Planer) updateNotificationList() {
 		}
 	}
 }
+
 func (p *Planer) Init() {
 	err := p.loadPlans("file.json")
 	if err != nil {
@@ -101,23 +147,19 @@ func (p *Planer) Init() {
 	}
 }
 
+//PlanFly ...
 func (p *Planer) PlanFly(info model.FlyPlan) (flyId uint64, err error) {
 	defer p.updateNotificationList()
-	p.plansData.PlanId++
-	info.FlyId = p.plansData.PlanId
-	if info.IsEveryDayPlan {
-		p.plansData.everyDayPlansMutex.Lock()
-		defer p.plansData.everyDayPlansMutex.Unlock()
-		p.plansData.EveryDayPlans = append(p.plansData.EveryDayPlans, info)
-	} else {
-		p.plansData.dateTimePlansMutex.Lock()
-		defer p.plansData.dateTimePlansMutex.Unlock()
-		p.plansData.DateTimePlans = append(p.plansData.DateTimePlans, info)
-	}
+	p.plansData.MaxPlanId++
+	info.FlyId = p.plansData.MaxPlanId
 
+	p.plansData.plansInfoMutex.Lock()
+	defer p.plansData.plansInfoMutex.Unlock()
+	p.plansData.PlansInfo[info.FlyId] = &info
 	return info.FlyId, err
 }
 
+//CancelFly ...
 func (p *Planer) CancelFly(flyId uint64) error {
 	p.notifyMapMutex.Lock()
 	defer p.notifyMapMutex.Unlock()
@@ -125,45 +167,38 @@ func (p *Planer) CancelFly(flyId uint64) error {
 		timer.Stop()
 		delete(p.notifyMap, flyId)
 	}
-
-	p.plansData.dateTimePlansMutex.Lock()
-	defer p.plansData.dateTimePlansMutex.Unlock()
-	for i, plan := range p.plansData.DateTimePlans {
-		if plan.FlyId != flyId {
-			continue
-		}
-		p.plansData.DateTimePlans[i] = p.plansData.DateTimePlans[len(p.plansData.DateTimePlans)-1]
-		p.plansData.DateTimePlans = p.plansData.DateTimePlans[:len(p.plansData.DateTimePlans)-1]
-		return nil
+	p.notifyMapMutex.Lock()
+	defer p.notifyMapMutex.Unlock()
+	if timer, ok := p.notifyMap[flyId]; ok {
+		timer.Stop()
+		delete(p.notifyMap, flyId)
 	}
-	p.plansData.everyDayPlansMutex.Lock()
-	defer p.plansData.everyDayPlansMutex.Unlock()
-	for i, plan := range p.plansData.EveryDayPlans {
-		if plan.FlyId != flyId {
-			continue
-		}
-		p.plansData.EveryDayPlans[i] = p.plansData.EveryDayPlans[len(p.plansData.EveryDayPlans)-1]
-		p.plansData.EveryDayPlans = p.plansData.EveryDayPlans[:len(p.plansData.EveryDayPlans)-1]
+	p.plansData.plansInfoMutex.Lock()
+	defer p.plansData.plansInfoMutex.Unlock()
+	if _, ok := p.plansData.PlansInfo[flyId]; ok {
+		delete(p.plansData.PlansInfo, flyId)
 		return nil
 	}
 	return errors.New("id not exist")
 }
 
+//NewPlaner ...
 func NewPlaner() *Planer {
 	return &Planer{plansData: plansData{
-		PlanId:             0,
-		EveryDayPlans:      nil,
-		DateTimePlans:      nil,
-		everyDayPlansMutex: &sync.Mutex{},
-		dateTimePlansMutex: &sync.Mutex{},
+		MaxPlanId:      0,
+		PlansInfo:      map[uint64]*model.FlyPlan{},
+		plansInfoMutex: &sync.Mutex{},
 	},
 		notifyMap:      map[uint64]*time.Timer{},
 		notifyMapMutex: &sync.Mutex{}}
 }
+
+//loadPlans ...
 func (p *Planer) loadPlans(filePath string) error {
 	var plansData = &plansData{
-		everyDayPlansMutex: &sync.Mutex{},
-		dateTimePlansMutex: &sync.Mutex{},
+		MaxPlanId:      0,
+		plansInfoMutex: &sync.Mutex{},
+		PlansInfo:      map[uint64]*model.FlyPlan{},
 	}
 
 	file, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0644)
@@ -180,12 +215,12 @@ func (p *Planer) loadPlans(filePath string) error {
 		}
 		return err
 	}
-
 	p.plansData = *plansData
-	//fmt.Println(plansData)
+	p.updateNotificationList()
 	return nil
 }
 
+//SavePlans ...
 func (p Planer) SavePlans(filePath string) error {
 	file, err := os.OpenFile(filePath, os.O_WRONLY, 0644)
 	if err != nil {
