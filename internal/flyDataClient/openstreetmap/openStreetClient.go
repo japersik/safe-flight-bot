@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"github.com/japersik/safe-flight-bot/model"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -18,7 +19,7 @@ type OpenStreetClient struct {
 	webClient http.Client
 }
 
-func (c OpenStreetClient) GetLocalityFlyInfo(coordinate flyDataClient.Coordinate) (*flyDataClient.LocalityInfo, error) {
+func (c OpenStreetClient) GetLocalityFlyInfo(coordinate model.Coordinate) (*flyDataClient.LocalityInfo, error) {
 	url, err := url.Parse(getDataEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,

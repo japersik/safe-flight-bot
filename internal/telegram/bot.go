@@ -3,15 +3,47 @@ package telegram
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
+	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
+	"github.com/japersik/safe-flight-bot/model"
+	"sync"
 )
 
-type Bot struct {
-	bot       *tgbotapi.BotAPI
-	flyClient flyDataClient.Client
+type flyPlanStage int
+
+const (
+	dateSelect flyPlanStage = iota
+	timeSelect
+	notifications
+)
+
+type plannedFlightInfo struct {
+	plan  model.FlyPlan
+	stage flyPlanStage
 }
 
-func NewBot(bot *tgbotapi.BotAPI, client flyDataClient.Client) *Bot {
-	return &Bot{bot: bot, flyClient: client}
+type Bot struct {
+	bot                 *tgbotapi.BotAPI
+	flyClient           flyDataClient.Client
+	planner             flyPlanner.Planner
+	flightPlanningUsers map[int64]plannedFlightInfo
+	planMutex           *sync.Mutex
+}
+
+func NewBot(bot *tgbotapi.BotAPI, client flyDataClient.Client, planner flyPlanner.Planner) *Bot {
+	myBot := &Bot{bot: bot, flyClient: client, planner: planner, flightPlanningUsers: map[int64]plannedFlightInfo{}, planMutex: &sync.Mutex{}}
+	planner.SetNotifier(myBot)
+	return myBot
+}
+
+func (b *Bot) Notify(flyPlan model.FlyPlan) error {
+	text, err := b.getInfoText(flyPlan.Data.Coordinate, 100)
+	if err != nil {
+		return err
+	}
+	text = "test text from notify\n " + text
+	msg := tgbotapi.NewMessage(flyPlan.Data.UserId, text)
+	_, err = b.Send(msg)
+	return err
 }
 
 func (b *Bot) Start() error {

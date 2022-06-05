@@ -5,6 +5,7 @@ import (
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient/avtmClient"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient/openstreetmap"
+	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
 	"github.com/japersik/safe-flight-bot/internal/telegram"
 	"log"
 	"os"
@@ -23,8 +24,12 @@ func main() {
 
 	avtm := avtmClient.NewAvtmClient()
 	maps := openstreetmap.NewOpenStreetClient()
+
 	flClient := flyDataClient.Client{WeatherInfoSource: avtm, ZoneInfoSource: avtm, LocalityInfoSource: maps}
-	myBot := telegram.NewBot(bot, flClient)
+
+	planner := flyPlanner.NewPlaner()
+
+	myBot := telegram.NewBot(bot, flClient, planner)
 
 	if err := myBot.Start(); err != nil {
 		log.Fatal("Error bot starting: ", err)
