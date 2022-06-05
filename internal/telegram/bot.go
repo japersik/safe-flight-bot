@@ -5,16 +5,32 @@ import (
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
 	"github.com/japersik/safe-flight-bot/model"
+	"sync"
 )
 
+type flyPlanStage int
+
+const (
+	dateSelect flyPlanStage = iota
+	timeSelect
+	notifications
+)
+
+type plannedFlightInfo struct {
+	plan  model.FlyPlan
+	stage flyPlanStage
+}
+
 type Bot struct {
-	bot       *tgbotapi.BotAPI
-	flyClient flyDataClient.Client
-	planner   flyPlanner.Planner
+	bot                 *tgbotapi.BotAPI
+	flyClient           flyDataClient.Client
+	planner             flyPlanner.Planner
+	flightPlanningUsers map[int64]plannedFlightInfo
+	planMutex           *sync.Mutex
 }
 
 func NewBot(bot *tgbotapi.BotAPI, client flyDataClient.Client, planner flyPlanner.Planner) *Bot {
-	myBot := &Bot{bot: bot, flyClient: client, planner: planner}
+	myBot := &Bot{bot: bot, flyClient: client, planner: planner, flightPlanningUsers: map[int64]plannedFlightInfo{}, planMutex: &sync.Mutex{}}
 	planner.SetNotifier(myBot)
 	return myBot
 }

@@ -24,7 +24,7 @@ func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Привет, отправь мне геолокацию для получения информации о возможности полётов")
 	numericKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButtonLocation("Проверить мой местоположение"),
+			tgbotapi.NewKeyboardButtonLocation("Проверить мое местоположение"),
 		),
 	)
 	msg.ReplyMarkup = numericKeyboard
@@ -64,18 +64,27 @@ func (b *Bot) handleGeoLocationMessage(message *tgbotapi.Message) error {
 	text, err := b.getInfoText(coord, 300)
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	msg.ParseMode = "HTML"
+
 	callbackPlanFly, _ := json.Marshal(Callback{
 		CallbackType: planFlyCallback,
+		Data:         coord,
+	})
+	callbackPlanEveryDayNotifications, _ := json.Marshal(Callback{
+		CallbackType: planFlyEdNotifications,
 		Data:         coord,
 	})
 	callbackRepeatRequest, _ := json.Marshal(Callback{
 		CallbackType: repeatRequestCallback,
 		Data:         coord,
 	})
-	numericKeyboard := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("Запланировать полёт тут ", string(callbackPlanFly)),
-		tgbotapi.NewInlineKeyboardButtonData("Повторить запрос ", string(callbackRepeatRequest)),
-	),
+	numericKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Запланировать полёт тут ", string(callbackPlanFly))),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Создать ежедневное уведомление", string(callbackPlanEveryDayNotifications))),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Повторить запрос ", string(callbackRepeatRequest)),
+		),
 	)
 
 	msg.ReplyMarkup = numericKeyboard
@@ -122,7 +131,7 @@ func (b Bot) getInfoText(coord model.Coordinate, radius int) (string, error) {
 		text += fmt.Sprintf("<b>Информация о погоде:</b> \n")
 		text += fmt.Sprintf("Температура: %v *C\n", weatherInfo.Current.Temperature)
 		text += fmt.Sprintf("Ветер: %v м/c, %v \n", weatherInfo.Current.WindSpeed, weatherInfo.Current.WindDeg)
-		text += fmt.Sprintf("Облачность: %v%% \n", weatherInfo.Current.Humidity)
+		text += fmt.Sprintf("Влажность: %v%% \n", weatherInfo.Current.Humidity)
 		text += fmt.Sprintf("Вероятность выпадения осадков: %v%% \n", weatherInfo.Current.PrecipProb*100)
 		text += fmt.Sprintf("Видимость: %v м\n", weatherInfo.Current.Visibility)
 		text += fmt.Sprintf("Давление: %v мм рт.ст. \n\n", weatherInfo.Current.Pressure)
