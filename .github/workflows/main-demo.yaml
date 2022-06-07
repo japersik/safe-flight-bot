@@ -8,28 +8,23 @@ env:
   IMAGE_NAME: "japersik/save-flight-bot"
   CONTAINER_NAME: "save-flight-bot-container"
 
-
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout master
         uses: actions/checkout@v2
-
       - name: Login to dockerhub
         uses: docker/login-action@v1
         with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Build container image
+      - name: Build and push container image
         run: docker buildx create --use && docker buildx build --platform=linux/amd64,linux/arm64,linux/arm/v7 -t $(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) --push .
 
   deploy:
     runs-on: ubuntu-latest
     needs: build_and_push
-
     steps:
       - name: Deploy to server via SSH action
         uses: appleboy/ssh-action@v0.1.3

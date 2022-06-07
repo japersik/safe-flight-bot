@@ -30,7 +30,9 @@ func main() {
 	planner := flyPlanner.NewPlaner()
 
 	myBot := telegram.NewBot(bot, flClient, planner)
-
+	planner.SetNotifier(myBot)
+	planner.Start()
+	defer planner.SavePlans("file.json")
 	if err := myBot.Start(); err != nil {
 		log.Fatal("Error bot starting: ", err)
 	}

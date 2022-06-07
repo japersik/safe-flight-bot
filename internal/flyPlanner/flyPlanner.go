@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const updateNotifyTime = 30 * time.Second
+const updateNotifyTime = 120 * time.Second
 
 type Planner interface {
 	SetNotifier(notifier Notifier)
@@ -110,6 +110,9 @@ func (p *Planer) addAllNotifications(plan model.FlyPlan) {
 		deltaT := plan.FlyDateTime.Sub(time.Now()) + notification
 		if plan.IsEveryDayPlan {
 			deltaT = deltaT % (time.Hour * 24)
+			if deltaT < 0 {
+				deltaT += time.Hour * 24
+			}
 		}
 		if deltaT <= updateNotifyTime && deltaT > -updateNotifyTime/2 {
 			fmt.Println("Adding ", deltaT, notification)
@@ -136,7 +139,9 @@ func (p *Planer) Init() {
 func (p *Planer) PlanFly(info model.FlyPlan) (flyId uint64, err error) {
 	p.plansData.MaxPlanId++
 	info.FlyId = p.plansData.MaxPlanId
-
+	if info.IsEveryDayPlan {
+		info.FlyDateTime = info.FlyDateTime.AddDate(time.Now().Year()-info.FlyDateTime.Year(), 0, 0)
+	}
 	p.plansData.plansInfoMutex.Lock()
 	defer p.plansData.plansInfoMutex.Unlock()
 	p.plansData.PlansInfo[info.FlyId] = &info
