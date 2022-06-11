@@ -47,7 +47,7 @@ jobs:
             export TG_BOT_TOKEN=${{ secrets.TG_TOKEN }}
             # Run a new container from a new image
             docker run -e TG_BOT_TOKEN -d -it \
-            -v $PWD/data:/root/data\
+            -v $(echo $PWD)/data:/root/data \
             --restart always \
             --name $(echo $CONTAINER_NAME) \
             $(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
