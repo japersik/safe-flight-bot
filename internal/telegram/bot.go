@@ -1,11 +1,13 @@
 package telegram
 
 import (
+	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
 	"github.com/japersik/safe-flight-bot/model"
+	"strconv"
 	"sync"
 )
 
@@ -61,8 +63,18 @@ func (b *Bot) Notify(flyPlan model.FlyPlan) error {
 	if err != nil {
 		return err
 	}
-	text = "test text from notify\n " + text
+	text = "Автоматическое уведомление №" + strconv.FormatUint(flyPlan.FlyId, 10) + "\n" + text
 	msg := tgbotapi.NewMessage(flyPlan.Data.UserId, text)
+	cancelFlyNotifications, _ := json.Marshal(Callback{
+		CallbackType: cancelFlyCallback,
+		Data:         flyPlan.FlyId,
+	})
+	numericKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Отключить уведомление", string(cancelFlyNotifications))),
+	)
+	msg.ReplyMarkup = numericKeyboard
+	msg.ParseMode = "HTML"
 	_, err = b.Send(msg)
 	return err
 }
@@ -85,6 +97,14 @@ func (b *Bot) manageUpdate(update tgbotapi.Update) {
 			fmt.Println(r)
 		}
 	}()
+	//var chatId int64
+	//if update.FromChat() != nil {
+	//	chatId = update.FromChat().ID
+	//} else if update.Message != nil {
+	//	chatId = update.Message.Chat.ID
+	//} else {
+	//	chatId = update.Poll.
+	//}
 	b.markupsMutex.Lock()
 	msg, ok := b.markupsToDelete[update.FromChat().ID]
 	b.markupsMutex.Unlock()
@@ -96,7 +116,7 @@ func (b *Bot) manageUpdate(update tgbotapi.Update) {
 	if ok {
 		return
 	}
-	fmt.Println("Not in plan mode")
+	//fmt.Println("Not in plan mode")
 	if update.CallbackData() != "" {
 		b.handleCallback(update.FromChat(), update.CallbackQuery)
 	} else if update.Message == nil {

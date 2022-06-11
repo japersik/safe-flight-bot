@@ -10,6 +10,14 @@ import (
 )
 
 func (b Bot) checkManageFlyPlanning(update tgbotapi.Update) (bool, error) {
+	//fmt.Println("HERE")
+	//fmt.Println(update)
+	//var id int64
+	//if update.FromChat() != nil {
+	//	id = update.FromChat().ID
+	//} else {
+	//	id = update.Message.Chat.ID
+	//}
 	b.planMutex.Lock()
 	pFlightInfo, ok := b.flightPlanningUsers[update.FromChat().ID]
 	b.planMutex.Unlock()
@@ -20,15 +28,14 @@ func (b Bot) checkManageFlyPlanning(update tgbotapi.Update) (bool, error) {
 		b.handlePlanFlyCallbacks(update.FromChat(), update.CallbackQuery)
 	} else if pFlightInfo.plan.IsEveryDayPlan {
 		switch pFlightInfo.stage {
-
 		case dateTimeSelect:
 			if t, err := parseTime(update.Message.Text, pFlightInfo.plan.Data.Coordinate); err != nil {
 				return true, b.sendFlyPlaningStatus(update.FromChat(), *pFlightInfo)
 			} else {
 				pFlightInfo.plan.FlyDateTime = t
 				pFlightInfo.plan.Notifications = []time.Duration{0}
-				flyId, err := b.planner.PlanFly(pFlightInfo.plan)
-				fmt.Println(flyId, err)
+				flyId, _ := b.planner.PlanFly(pFlightInfo.plan)
+				//fmt.Println(flyId, err)
 				delete(b.flightPlanningUsers, update.FromChat().ID)
 				return true, b.sendPlanCreated(update.FromChat(), flyId)
 			}
@@ -40,17 +47,44 @@ func (b Bot) checkManageFlyPlanning(update tgbotapi.Update) (bool, error) {
 				return true, err
 			} else {
 				pFlightInfo.plan.FlyDateTime = t
-				pFlightInfo.plan.Notifications = []time.Duration{0}
-				//b.planner.PlanFly(pFlightInfo.plan)
-				pFlightInfo.stage = notifications
-				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Переход в стадию выбора оповещений")
-				b.bot.Send(msg)
+				pFlightInfo.plan.Notifications = []time.Duration{-48 * time.Hour, -24 * time.Hour, -12 * time.Hour, -3 * time.Hour,
+					-2 * time.Hour, -1 * time.Hour, 0, 1 * time.Hour, 2 * time.Hour}
+				flyId, _ := b.planner.PlanFly(pFlightInfo.plan)
+				delete(b.flightPlanningUsers, update.FromChat().ID)
+				return true, b.sendPlanCreated(update.FromChat(), flyId)
+				//return true, b.sendSelectNotificationsTime(update.FromChat())
 			}
+			//case notifications:
+			//	fmt.Println(pFlightInfo)
+			//	fmt.Println(update.Message)
 		}
 	}
 	return true, nil
 }
 
+//var selectTime = map[string]time.Duration{
+//	"За 2 дня до запланированного времени":        -48 * time.Hour,
+//	"За 1 день до запланированного времени":       -24 * time.Hour,
+//	"За 12 часов до запланированного времени":     -12 * time.Hour,
+//	"За 3 часа до запланированного времени":       -3 * time.Hour,
+//	"За 2 часа до запланированного времени":       -2 * time.Hour,
+//	"За 1 час до запланированного времени":        -time.Hour,
+//	"В запланированное время":                     0,
+//	"Через 1 час после запланированного времени":  time.Hour,
+//	"Через 2 часа после запланированного времени": 2 * time.Hour,
+//	"Через 3 часа после запланированного времени": 3 * time.Hour,
+//}
+//
+//func (b *Bot) sendSelectNotificationsTime(chat *tgbotapi.Chat) error {
+//	options := make([]string, 0, len(selectTime))
+//	for i, _ := range selectTime {
+//		options = append(options, i)
+//	}
+//	msg := tgbotapi.NewPoll(chat.ID, "В какое время стоит уведомить об обстановке?", options...)
+//	msg.AllowsMultipleAnswers = true
+//	_, err := b.bot.Send(msg)
+//	return err
+//}
 func (b *Bot) handlePlanFlyCallbacks(chat *tgbotapi.Chat, query *tgbotapi.CallbackQuery) error {
 	var text string
 	callbackData := query.Data
@@ -61,6 +95,9 @@ func (b *Bot) handlePlanFlyCallbacks(chat *tgbotapi.Chat, query *tgbotapi.Callba
 	}
 	switch callback.CallbackType {
 	case cancelPlanFlyCallback:
+		b.planMutex.Lock()
+		delete(b.flightPlanningUsers, chat.ID)
+		b.planMutex.Unlock()
 		return b.sendFlightPlanningCanceled(chat)
 	default:
 		fmt.Println(callback)

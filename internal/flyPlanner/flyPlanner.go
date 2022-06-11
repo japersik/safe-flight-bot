@@ -35,10 +35,24 @@ type Planer struct {
 	plansData      *plansData
 	notifyMap      map[runningPlan]*time.Timer
 	notifyMapMutex *sync.Mutex
+	filepath       string
 }
 type runningPlan struct {
 	flyId        uint64
 	notification time.Duration
+}
+
+//NewPlaner ...
+func NewPlaner(filepath string) *Planer {
+	return &Planer{plansData: &plansData{
+		MaxPlanId:      0,
+		PlansInfo:      map[uint64]*model.FlyPlan{},
+		plansInfoMutex: &sync.Mutex{},
+	},
+		notifyMap:      map[runningPlan]*time.Timer{},
+		notifyMapMutex: &sync.Mutex{},
+		filepath:       filepath}
+
 }
 
 //SetNotifier ...
@@ -115,7 +129,7 @@ func (p *Planer) addAllNotifications(plan model.FlyPlan) {
 			}
 		}
 		if deltaT <= updateNotifyTime && deltaT > -updateNotifyTime/2 {
-			fmt.Println("Adding ", deltaT, notification)
+			//fmt.Println("Adding ", deltaT, notification)
 			notificationInfo := runningPlan{plan.FlyId, notification}
 			if _, ok := p.notifyMap[notificationInfo]; !ok {
 				p.notifyMap[notificationInfo] = time.AfterFunc(deltaT, func() {
@@ -129,7 +143,7 @@ func (p *Planer) addAllNotifications(plan model.FlyPlan) {
 	}
 }
 func (p *Planer) Init() {
-	err := p.loadPlans("file.json")
+	err := p.loadPlans()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -169,26 +183,14 @@ func (p *Planer) CancelFly(flyId uint64) error {
 	return errors.New("id not exist")
 }
 
-//NewPlaner ...
-func NewPlaner() *Planer {
-	return &Planer{plansData: &plansData{
-		MaxPlanId:      0,
-		PlansInfo:      map[uint64]*model.FlyPlan{},
-		plansInfoMutex: &sync.Mutex{},
-	},
-		notifyMap:      map[runningPlan]*time.Timer{},
-		notifyMapMutex: &sync.Mutex{}}
-}
-
 //loadPlans ...
-func (p *Planer) loadPlans(filePath string) error {
+func (p *Planer) loadPlans() error {
 	var plansData = &plansData{
 		MaxPlanId:      0,
 		plansInfoMutex: &sync.Mutex{},
 		PlansInfo:      map[uint64]*model.FlyPlan{},
 	}
-
-	file, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0644)
+	file, err := os.OpenFile(p.filepath, os.O_RDONLY|os.O_CREATE, 0644)
 	defer file.Close()
 	if err != nil {
 		return err
@@ -208,8 +210,8 @@ func (p *Planer) loadPlans(filePath string) error {
 }
 
 //SavePlans ...
-func (p Planer) SavePlans(filePath string) error {
-	file, err := os.OpenFile(filePath, os.O_WRONLY, 0644)
+func (p Planer) SavePlans() error {
+	file, err := os.OpenFile(p.filepath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

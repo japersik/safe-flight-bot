@@ -11,5 +11,5 @@ RUN apk add --no-cache tzdata
 
 WORKDIR /root/
 COPY --from=0 /github.com/japersik/safe-flight-bot/bin/bot .
-
+COPY --from=0 /github.com/japersik/safe-flight-bot/data .
 CMD ["./bot"]
