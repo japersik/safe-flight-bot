@@ -50,7 +50,7 @@ func (b *Bot) handleInfoCommand(message *tgbotapi.Message) error {
 }
 
 func (b *Bot) handleUnknownCommand(message *tgbotapi.Message) error {
-	text := "Эта команда не поддерживается"
+	text := "Сейчас эта команда не поддерживается"
 	msg := tgbotapi.NewMessage(message.Chat.ID, text)
 	_, err := b.Send(msg)
 	return err

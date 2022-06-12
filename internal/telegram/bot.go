@@ -2,11 +2,11 @@ package telegram
 
 import (
 	"encoding/json"
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
 	"github.com/japersik/safe-flight-bot/model"
+	"log"
 	"strconv"
 	"sync"
 )
@@ -79,11 +79,11 @@ func (b *Bot) Notify(flyPlan model.FlyPlan) error {
 	return err
 }
 
-//Start ..
+//Start запуск обработки обновлений
 func (b *Bot) Start() error {
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-
 	updates := b.bot.GetUpdatesChan(u)
 	for update := range updates {
 		go b.manageUpdate(update)
@@ -94,17 +94,9 @@ func (b *Bot) Start() error {
 func (b *Bot) manageUpdate(update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println(r)
+			log.Println("message processing error ", r)
 		}
 	}()
-	//var chatId int64
-	//if update.FromChat() != nil {
-	//	chatId = update.FromChat().ID
-	//} else if update.Message != nil {
-	//	chatId = update.Message.Chat.ID
-	//} else {
-	//	chatId = update.Poll.
-	//}
 	b.markupsMutex.Lock()
 	msg, ok := b.markupsToDelete[update.FromChat().ID]
 	b.markupsMutex.Unlock()
@@ -116,21 +108,15 @@ func (b *Bot) manageUpdate(update tgbotapi.Update) {
 	if ok {
 		return
 	}
-	//fmt.Println("Not in plan mode")
 	if update.CallbackData() != "" {
 		b.handleCallback(update.FromChat(), update.CallbackQuery)
 	} else if update.Message == nil {
-		// ignore any non-Message Updates
 	} else if update.Message.Location != nil {
-		// Обработка отправленной геолокации
 		b.handleGeoLocationMessage(update.Message)
 	} else if update.Message.IsCommand() {
-		// Обработка отправленной команды
 		b.handleCommand(update.Message)
 	} else {
-		// Обработка Остальных сообщений
-		msg := tgbotapi.NewPoll(update.Message.Chat.ID, "123123", "123m", "123")
-		//msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Команда не поддерживается.")
 		b.bot.Send(msg)
 	}
 }

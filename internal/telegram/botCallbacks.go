@@ -24,7 +24,6 @@ func (b *Bot) handleCallback(chat *tgbotapi.Chat, query *tgbotapi.CallbackQuery)
 	var text string
 	callbackData := query.Data
 
-	//fmt.Println(callbackData)
 	callback := Callback{}
 	err := json.Unmarshal([]byte(callbackData), &callback)
 	if err != nil {
@@ -63,7 +62,7 @@ func (b *Bot) handleCallback(chat *tgbotapi.Chat, query *tgbotapi.CallbackQuery)
 		}
 		return b.handleRepeatRequestCallback(chat, coords)
 	default:
-		text = " Еще не реализовано:("
+		text = "Еще не реализовано:("
 	}
 	msg := tgbotapi.NewMessage(chat.ID, text)
 	msg.ParseMode = "HTML"

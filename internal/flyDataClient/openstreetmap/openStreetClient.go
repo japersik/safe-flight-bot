@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/model"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -20,6 +21,7 @@ type OpenStreetClient struct {
 }
 
 func (c OpenStreetClient) GetLocalityFlyInfo(coordinate model.Coordinate) (*flyDataClient.LocalityInfo, error) {
+	log.Printf("getting information about locality at point (%f, %f)\n", coordinate.Lat, coordinate.Lng)
 	url, err := url.Parse(getDataEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,

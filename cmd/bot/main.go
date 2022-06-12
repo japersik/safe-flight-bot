@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient/avtmClient"
@@ -15,6 +14,7 @@ import (
 )
 
 func main() {
+	log.SetOutput(os.Stdout)
 	shutdownSignal := make(chan os.Signal, 1)
 	signal.Notify(shutdownSignal, syscall.SIGQUIT, syscall.SIGINT, syscall.SIGTERM)
 
@@ -41,11 +41,16 @@ func main() {
 	planner.Start()
 	go func() {
 		<-shutdownSignal
-		planner.SavePlans()
-		fmt.Println("ok")
+		err := planner.SavePlans()
+		if err != nil {
+			log.Print("exit the program, data file save error ", err)
+		} else {
+			log.Println("exit the program, the data file is saved.")
+		}
+
 		os.Exit(0)
 	}()
 	if err := myBot.Start(); err != nil {
-		log.Fatal("Error bot starting: ", err)
+		log.Fatal("error bot starting: ", err)
 	}
 }

@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"encoding/json"
-	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/model"
 	"github.com/zsefvlol/timezonemapper"
@@ -86,7 +85,6 @@ func (b Bot) checkManageFlyPlanning(update tgbotapi.Update) (bool, error) {
 //	return err
 //}
 func (b *Bot) handlePlanFlyCallbacks(chat *tgbotapi.Chat, query *tgbotapi.CallbackQuery) error {
-	var text string
 	callbackData := query.Data
 	callback := Callback{}
 	err := json.Unmarshal([]byte(callbackData), &callback)
@@ -100,13 +98,9 @@ func (b *Bot) handlePlanFlyCallbacks(chat *tgbotapi.Chat, query *tgbotapi.Callba
 		b.planMutex.Unlock()
 		return b.sendFlightPlanningCanceled(chat)
 	default:
-		fmt.Println(callback)
-		text = " Еще не реализовано:("
+		status := b.flightPlanningUsers[chat.ID]
+		return b.sendFlyPlaningStatus(chat, *status)
 	}
-	msg := tgbotapi.NewMessage(chat.ID, text)
-	msg.ParseMode = "HTML"
-	_, err = b.Send(msg)
-	return err
 }
 
 func parseTime(str string, coordinate model.Coordinate) (time.Time, error) {
@@ -165,7 +159,7 @@ func (b Bot) sendNeedDateSelect(chat *tgbotapi.Chat) error {
 func (b Bot) sendNeedTimeSelect(chat *tgbotapi.Chat) error {
 	text :=
 		`Вы находитесь в режиме планирования.
- Напишите местное время в формате <b>23:59</b> или нажмите кнопку "Отмена" дял отмены планирования полета`
+ Напишите местное время в формате <b>23:59</b> или нажмите кнопку "Отмена" для отмены планирования полета`
 	msg := tgbotapi.NewMessage(chat.ID, text)
 	msg.ParseMode = "HTML"
 	callbackPlanEveryDayNotifications, _ := json.Marshal(Callback{
