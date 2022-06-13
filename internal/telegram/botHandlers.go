@@ -41,7 +41,7 @@ func (b *Bot) handleInfoCommand(message *tgbotapi.Message) error {
 	msg.ParseMode = "HTML"
 	numericKeyboard := tgbotapi.NewReplyKeyboard(
 		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButtonLocation("Проверить моё местоположение"),
+			tgbotapi.NewKeyboardButtonLocation("Проверить мое местоположение"),
 		),
 	)
 	msg.ReplyMarkup = numericKeyboard
