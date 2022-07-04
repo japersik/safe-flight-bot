@@ -5,8 +5,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/japersik/safe-flight-bot/internal/flyDataClient"
 	"github.com/japersik/safe-flight-bot/internal/flyPlanner"
+	"github.com/japersik/safe-flight-bot/logger"
 	"github.com/japersik/safe-flight-bot/model"
-	"log"
 	"strconv"
 	"sync"
 )
@@ -94,7 +94,7 @@ func (b *Bot) Start() error {
 func (b *Bot) manageUpdate(update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("message processing error ", r)
+			logger.Error("message processing error ", r)
 		}
 	}()
 	b.markupsMutex.Lock()

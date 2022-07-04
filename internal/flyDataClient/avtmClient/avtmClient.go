@@ -3,8 +3,8 @@ package avtmClient
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/japersik/safe-flight-bot/logger"
 	"github.com/japersik/safe-flight-bot/model"
-	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -102,7 +102,7 @@ func (jwd JSONWeatherData) castToWeatherData(loc *time.Location) model.WeatherDa
 
 //GetForecastWeather receives forecast weather as flyDataClient.WeatherData form Avmt api.
 func (c AvtmClient) GetForecastWeather(coordinate model.Coordinate) (*model.WeatherForecast, error) {
-	log.Printf("getting weather forecast at point (%f, %f)\n", coordinate.Lat, coordinate.Lng)
+	logger.InfoF("getting weather forecast at point (%f, %f)\n", coordinate.Lat, coordinate.Lng)
 	url, err := url.Parse(forecastWeatherEndPoint)
 	var req = &http.Request{
 		Method: http.MethodGet,
@@ -205,7 +205,7 @@ func (loc *JSONCheckConditions) castJSONtoCondition() model.Condition {
 
 //CheckConditions  receives fly zone Conditions form Avmt api.
 func (c AvtmClient) CheckConditions(coordinate model.Coordinate, radius int) (model.Condition, error) {
-	log.Printf("getting information about fly zones at point (%f, %f)\n", coordinate.Lat, coordinate.Lng)
+	logger.Info("getting information about fly zones at point (%f, %f)\n", coordinate.Lat, coordinate.Lng)
 	type Geometry struct {
 		Type        string         `json:"type"`
 		Coordinates [][][2]float64 `json:"coordinates"`

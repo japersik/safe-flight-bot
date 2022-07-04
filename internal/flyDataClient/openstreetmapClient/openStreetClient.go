@@ -1,4 +1,4 @@
-package openstreetmap
+package openstreetmapClient
 
 import (
 	"encoding/json"

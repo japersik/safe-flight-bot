@@ -3,9 +3,9 @@ package flyPlanner
 import (
 	"encoding/json"
 	"errors"
+	"github.com/japersik/safe-flight-bot/logger"
 	"github.com/japersik/safe-flight-bot/model"
 	"io"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -61,7 +61,7 @@ func (p *Planer) SetNotifier(notifier Notifier) {
 
 //Start ...
 func (p *Planer) Start() error {
-	log.Println("notification starting")
+	logger.Info("notification starting")
 	if p.notifier == nil {
 		return errors.New("notifier not defined")
 	}
@@ -145,7 +145,7 @@ func (p *Planer) addAllNotifications(plan model.FlyPlan) {
 func (p *Planer) Init() {
 	err := p.loadPlans()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 }
 
@@ -160,14 +160,14 @@ func (p *Planer) PlanFly(info model.FlyPlan) (uint64, error) {
 	defer p.plansData.plansInfoMutex.Unlock()
 	p.plansData.PlansInfo[info.FlyId] = &info
 	p.addAllNotifications(info)
-	log.Printf("flight No.%d from user %d created at (%f, %f)\n", info.FlyId, info.Data.UserId,
+	logger.InfoF("flight No.%d from user %d created at (%f, %f)\n", info.FlyId, info.Data.UserId,
 		info.Data.Coordinate.Lat, info.Data.Coordinate.Lng)
 	return info.FlyId, nil
 }
 
 //CancelFly ...
 func (p *Planer) CancelFly(flyId uint64) error {
-	log.Printf("flight No.%d canceled\n", flyId)
+	logger.InfoF("flight No.%d canceled\n", flyId)
 	p.notifyMapMutex.Lock()
 	defer p.notifyMapMutex.Unlock()
 	for plan, timer := range p.notifyMap {
@@ -202,13 +202,13 @@ func (p *Planer) loadPlans() error {
 	err = decoder.Decode(plansData)
 	if err != nil {
 		if err == io.EOF {
-			log.Println("Creating new data file")
+			logger.Info("Creating new data file")
 			return nil
 		}
 		return err
 	}
 	p.plansData = plansData
-	log.Printf("flight plan file loaded. There are %d plans in total. Max id %d", len(plansData.PlansInfo), plansData.MaxPlanId)
+	logger.InfoF("flight plan file loaded. There are %d plans in total. Max id %d", len(plansData.PlansInfo), plansData.MaxPlanId)
 	p.updateNotificationList()
 	return nil
 }
